@@ -1,0 +1,53 @@
+# This file is updated and merged from upstream's manifest.yaml. Comments
+# are prefixed to avoid confusion
+
+# echtish: We'll run our own ostree repo and rebase against fedora's remote, use
+# a proper ref
+ref: echtish/${basearch}/coreos/echtish-devel
+# echtish: override the usual include of manifests/fedora-coreos.yaml
+# We want python and treefile lists are merged instead of overridden.
+# Guess we'll have to re-implement it instead.
+include: manifests/echtish-coreos.yaml
+
+releasever: "32"
+
+rojig:
+  license: MIT
+  name: fedora-coreos
+  summary: Fedora CoreOS echtish-devel
+
+repos:
+  # these repos are there to make it easier to add new packages to the OS and to
+  # use `cosa fetch --update-lockfile`; but note that all package versions are
+  # still pinned
+  - fedora
+  - fedora-updates
+
+# All Fedora CoreOS streams share the same pool for locked files.
+# This will be in fedora-coreos.yaml in the future so it can be more easily be
+# shared between all the streams
+lockfile-repos:
+  - fedora-coreos-pool
+
+# echtish: zincati should eventually support other streams. we'll be running a
+# ostree repo to rebase from, but track a stream in metadata in the hopes that
+# we'll have our own Cincinnati eventually
+# https://github.com/coreos/fedora-coreos-tracker/issues/240
+# https://github.com/coreos/rpm-ostree/pull/1865
+# https://github.com/coreos/fedora-coreos-config/pull/110
+add-commit-metadata:
+  fedora-coreos.stream: echtish-devel
+
+# Put this in manifest.yaml for now and we'll delete when we move to
+# F33 where all of these files have been broken out to the systemd-networkd
+# subpackage.
+remove-from-packages:
+  # We're not using networkd.
+  - [systemd, /etc/systemd/networkd.conf,
+              /usr/lib/systemd/systemd-networkd,
+              /usr/lib/systemd/systemd-networkd-wait-online,
+              /usr/lib/systemd/network/.*,
+              /usr/lib/systemd/system/systemd-networkd.service,
+              /usr/lib/systemd/system/systemd-networkd.socket,
+              /usr/lib/systemd/system/systemd-networkd-wait-online.service]
+  - [systemd-container, /usr/lib/systemd/network/.*]

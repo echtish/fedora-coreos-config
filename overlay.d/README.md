@@ -57,3 +57,8 @@ Things that are more closely "Fedora CoreOS":
 -----------------
 
 Platform aware timeserver setup for chrony daemon.
+
+99echtish
+---------
+
+Install rpm-ostree package overlay on firstboot. Hashicorp and Ansible for good times.

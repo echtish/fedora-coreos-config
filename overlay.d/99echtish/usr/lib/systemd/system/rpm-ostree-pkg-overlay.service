@@ -1,0 +1,27 @@
+# Service to install random shit that Fedora wants nothing to do with.
+# rpm-ostree will preserve the pkg overlay after upgrades. We try to put
+# this after all upstream stuff happens -- anything with
+# After=boot-complete.target and ConditionFirstBoot=yes -- since we need
+# to reboot into the new system. If 'ex livefs' proves reliable, we might
+# ditch tracking upstream's units.
+[Unit]
+Description=Install rpm-ostree pkg overlay (Hashicorp & Ansible) on firstboot
+ConditionFirstBoot=yes
+# On stateless (live) PXE systems, this path exists. If we use "ex livefs"
+# below for the install, we don't need this
+ConditionPathExists=!/run/ostree-live
+Wants=network-online.target
+After=network-online.target
+After=boot-complete.target
+After=afterburn-firstboot-checkin.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+Environment=OVERLAY_PKGS="ansible consul nomad vault"
+ExecStart=/usr/bin/rpm-ostree install --reboot $OVERLAY_PKGS
+# An alternative to --reboot
+# ExecStartPost=/usr/bin/rpm-ostree ex livefs --i-like-danger
+
+[Install]
+WantedBy=multi-user.target

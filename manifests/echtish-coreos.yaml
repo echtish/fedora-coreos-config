@@ -1,0 +1,96 @@
+# Re-implement fedora-coreos.yaml.
+# We should always merge changes from testing-devel
+
+include: fedora-coreos-base.yaml
+
+# Prefix is used in Zincati checks. We'll update it as we like until Fedora
+# produces docs on how to setup things like Cincinnati
+# https://github.com/coreos/fedora-coreos-tracker/issues/240#issuecomment-524766728
+automatic-version-prefix: "${releasever}.<date:%Y%m%d>.echtish.dev"
+mutate-os-release: "${releasever}"
+
+packages:
+  # required for SELinux booleans for postprocess scripts (container_use_cephfs)
+  - container-selinux
+  # provides /usr/lib/os-release
+  - fedora-release-coreos
+  # ostree remote ref definitions
+  - fedora-repos-ostree
+  # the archive repo for more reliable package layering
+  # https://github.com/coreos/fedora-coreos-tracker/issues/400
+  - fedora-repos-archive
+  # User metrics, disabled in ../manifest.yaml for dev
+  - fedora-coreos-pinger
+  # Updates, disabled in ../manifest.yaml for dev
+  - zincati
+
+# ⚠⚠⚠ ONLY TEMPORARY HACKS ALLOWED HERE; ALL ENTRIES NEED TRACKER LINKS ⚠⚠⚠
+# See also the version of this in fedora-coreos-base.yaml
+postprocess:
+  # Disable Zincati and fedora-coreos-pinger on non-release builds
+  # https://github.com/coreos/fedora-coreos-tracker/issues/212
+  - |
+    #!/usr/bin/env bash
+    set -xeuo pipefail
+    source /etc/os-release
+    if [[ $OSTREE_VERSION = *.dev* ]]; then
+      mkdir -p /etc/fedora-coreos-pinger/config.d /etc/zincati/config.d
+      echo -e '# https://github.com/coreos/fedora-coreos-tracker/issues/212\nreporting.enabled = false' > /etc/fedora-coreos-pinger/config.d/95-disable-on-dev.toml
+      echo -e '# https://github.com/coreos/fedora-coreos-tracker/issues/212\nupdates.enabled = false' > /etc/zincati/config.d/95-disable-on-dev.toml
+    fi
+  # Users shouldn't be configuring `rpm-ostreed.conf`
+  # https://github.com/coreos/fedora-coreos-tracker/issues/271
+  - |
+    #!/usr/bin/env bash
+    set -xeuo pipefail
+    cat > /tmp/rpm-ostreed.conf << 'EOF'
+    # By default, this system has its OS updates managed by
+    # `zincati.service`.  Changes made to this file may
+    # conflict with the configuation of `zincati.service`.
+    # See https://github.com/coreos/zincati for additional
+    # information.
+
+    EOF
+    cat /usr/etc/rpm-ostreed.conf >> /tmp/rpm-ostreed.conf
+    cp /tmp/rpm-ostreed.conf /usr/etc/rpm-ostreed.conf
+    rm /tmp/rpm-ostreed.conf
+  # Enable systemd debug output for now
+  - |
+    #!/usr/bin/env bash
+    set -xeuo pipefail
+    sed -i 's/^#LogLevel=info$/LogLevel=debug/' /etc/systemd/system.conf
+
+remove-from-packages:
+  # Drop NetworkManager support for ifcfg files, see also corresponding
+  # overlay.d/14NetworkManager-plugins
+  - [NetworkManager, /usr/lib64/NetworkManager/.*/libnm-settings-plugin-ifcfg-rh.so]
+
+remove-files:
+  # We don't ship man(1) or info(1)
+  - usr/share/info
+  - usr/share/man
+  # Drop text docs too
+  - usr/share/doc
+
+# Things we don't expect to ship on the host.  We currently
+# have recommends: false so these could only come in via
+# hard requirement, in which case the build will fail.
+# N.B., we include python3 for echtish. We want every node to be able to
+# function as an Ansible host.
+exclude-packages:
+  - python
+  - python2
+  - perl
+  - nodejs
+  - dnf
+  - grubby
+  - cowsay  # Just in case
+  # Let's make sure initscripts doesn't get pulled back in
+  # https://github.com/coreos/fedora-coreos-tracker/issues/220#issuecomment-611566254
+  - initscripts
+
+# And remove some cruft from grub2
+arch-include:
+  x86_64: grub2-removals.yaml
+  aarch64: grub2-removals.yaml
+  ppc64le: grub2-removals.yaml

@@ -1,0 +1,2 @@
+# Install pkg overlay on first boot
+enable rpm-ostree-pkg-overlay.service
